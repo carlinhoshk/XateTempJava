@@ -1,0 +1,24 @@
+services:
+  app:
+    build: .
+    environment:
+      DB_PATH: /app/data/temp-chat.db
+      TEMPCHAT_STORAGE_MIDIA: /app/data/midia
+    volumes:
+      - app-data:/app/data
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - nginx-logs:/var/log/nginx
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  app-data:
+  nginx-logs:
