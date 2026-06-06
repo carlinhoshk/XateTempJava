@@ -80,6 +80,21 @@
             text-align: center; font-size: 0.8rem; color: #666; padding: 0.3rem;
         }
         .loading-msg { text-align: center; color: #666; font-size: 0.85rem; padding: 1rem; }
+
+        @media (max-width: 600px) {
+            #header input { display: none; }
+            #header .btn-copy { font-size: 0; }
+            #header .btn-copy::after { content: "\1f517"; font-size: 1.2rem; }
+            #header h2 { font-size: 0.85rem; }
+            #header { padding: 0.4rem 0.6rem; }
+            #status { font-size: 0.7rem; padding: 0.3rem; }
+            #messages { padding: 0.5rem; }
+            #input-area { padding: 0.5rem 0.6rem; gap: 0.3rem; padding-bottom: env(safe-area-inset-bottom, 0.5rem); }
+            #messageInput { font-size: 16px; padding: 0.6rem 0.8rem; }
+            .file-btn, .send-btn { min-width: 44px; min-height: 44px; font-size: 0.8rem; padding: 0.5rem 0.8rem; }
+            .msg { max-width: 85%; font-size: 0.85rem; }
+            .msg img, .msg video { max-height: 200px; }
+        }
     </style>
 </head>
 <body>
@@ -96,7 +111,7 @@
     </div>
     <div id="typing"></div>
     <div id="input-area">
-        <button class="file-btn" onclick="document.getElementById('fileInput').click()">&#x1f4c1;</button>
+        <button class="file-btn" onclick="document.getElementById('fileInput').click()">Mídia</button>
         <input type="file" id="fileInput" accept="image/*,video/*" onchange="enviarArquivo()">
         <input type="text" id="messageInput" placeholder="Digite sua mensagem..." onkeypress="if(event.key==='Enter') enviarMensagem()">
         <button class="send-btn" onclick="enviarMensagem()">Enviar</button>
@@ -264,6 +279,19 @@
         window.addEventListener('beforeunload', function() {
             if (ws) { ws.close(); }
         });
+
+        (function() {
+            const input = document.getElementById('messageInput');
+            input.addEventListener('focus', function() {
+                setTimeout(function() { input.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 400);
+            });
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', function() {
+                    var diff = window.innerHeight - window.visualViewport.height;
+                    document.getElementById('input-area').style.paddingBottom = Math.max(diff, 0) + 'px';
+                });
+            }
+        })();
     </script>
 </body>
 </html>

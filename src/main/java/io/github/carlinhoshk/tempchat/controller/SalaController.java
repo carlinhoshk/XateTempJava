@@ -50,7 +50,7 @@ public class SalaController {
                              Model model,
                              HttpServletRequest request) {
         if (tokenUuid == null || !tokenService.validarToken(tokenUuid)) {
-            return "redirect:/";
+            return "redirect:/?redirectTo=/sala/" + hash;
         }
         if (!salaService.validarSala(hash)) {
             model.addAttribute("erro", "Sala não encontrada ou expirada");

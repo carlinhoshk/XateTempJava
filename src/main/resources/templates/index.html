@@ -59,6 +59,7 @@
             <h1>TempChat</h1>
             <p class="subtitle">Chat temporário para 2 pessoas.<br>Sem cadastro. Sem rastreamento. Privacidade total.</p>
             <form method="post" action="/criar-token">
+                <input type="hidden" name="redirectTo" th:value="${redirectTo}" th:if="${redirectTo != null}" />
                 <button type="submit" class="btn">Criar Acesso de 24h</button>
             </form>
             <p class="info">Seu acesso expira automaticamente em 24 horas. Sem e-mail, sem senha.</p>

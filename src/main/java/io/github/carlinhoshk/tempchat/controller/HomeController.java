@@ -11,6 +11,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.util.LinkedHashMap;
@@ -31,7 +32,9 @@ public class HomeController {
 
     @GetMapping("/")
     public String index(@CookieValue(value = "token", required = false) String tokenUuid,
+                        @RequestParam(value = "redirectTo", required = false) String redirectTo,
                         Model model) {
+        model.addAttribute("redirectTo", redirectTo);
         if (tokenUuid == null) {
             model.addAttribute("temToken", false);
             return "index";
@@ -45,7 +48,8 @@ public class HomeController {
     }
 
     @PostMapping("/criar-token")
-    public String criarToken(HttpServletResponse response) {
+    public String criarToken(HttpServletResponse response,
+                             @RequestParam(value = "redirectTo", required = false) String redirectTo) {
         Token token = tokenService.criarToken();
         Cookie cookie = new Cookie("token", token.getUuid());
         cookie.setMaxAge(24 * 60 * 60);
@@ -53,6 +57,9 @@ public class HomeController {
         cookie.setHttpOnly(true);
         cookie.setSecure(false);
         response.addCookie(cookie);
+        if (redirectTo != null && !redirectTo.isBlank()) {
+            return "redirect:" + redirectTo;
+        }
         return "redirect:/";
     }
 
