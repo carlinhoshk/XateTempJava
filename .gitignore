@@ -1,0 +1,7 @@
+target/
+temp-chat.db
+/tmp/tempchat/
+*.log
+.idea/
+*.iml
+.vscode/

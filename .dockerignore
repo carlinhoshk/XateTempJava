@@ -1,0 +1,8 @@
+target/
+temp-chat.db
+*.log
+.idea/
+.vscode/
+.git/
+docker-compose.yml
+nginx/
