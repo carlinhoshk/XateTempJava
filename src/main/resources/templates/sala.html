@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TempChat - Sala</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f0f0f; color: #e0e0e0; height: 100vh; display: flex;
+            flex-direction: column; overflow: hidden;
+        }
+        #header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0.8rem 1.2rem; background: #1a1a2e; border-bottom: 1px solid #2d2d44;
+            flex-shrink: 0;
+        }
+        #header h2 { font-size: 1rem; color: #fff; }
+        #header input {
+            padding: 0.4rem 0.6rem; border: 1px solid #444; border-radius: 6px;
+            background: #0f0f0f; color: #e0e0e0; font-size: 0.8rem; width: 220px;
+        }
+        #header .btn-copy {
+            padding: 0.4rem 0.8rem; border: none; border-radius: 6px; cursor: pointer;
+            background: #6c5ce7; color: #fff; font-size: 0.8rem; margin-left: 0.5rem;
+        }
+        #status {
+            text-align: center; font-size: 0.8rem; color: #888;
+            padding: 0.4rem; background: #1a1a2e; border-bottom: 1px solid #2d2d44;
+            flex-shrink: 0;
+        }
+        #status .connected { color: #2ecc71; }
+        #messages {
+            flex: 1; overflow-y: auto; padding: 1rem; display: flex;
+            flex-direction: column; gap: 0.5rem;
+        }
+        .msg {
+            max-width: 75%; padding: 0.6rem 1rem; border-radius: 14px;
+            font-size: 0.9rem; line-height: 1.4; word-wrap: break-word;
+        }
+        .msg.enviada {
+            align-self: flex-end; background: #6c5ce7; color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+        .msg.recebida {
+            align-self: flex-start; background: #2d2d44; color: #e0e0e0;
+            border-bottom-left-radius: 4px;
+        }
+        .msg .hora {
+            font-size: 0.65rem; opacity: 0.6; margin-top: 0.2rem;
+        }
+        .msg img, .msg video {
+            max-width: 100%; max-height: 300px; border-radius: 8px; display: block;
+        }
+        .msg .midia-nome {
+            font-size: 0.75rem; opacity: 0.7; margin-top: 0.3rem; display: block;
+        }
+        #input-area {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.8rem 1.2rem; background: #1a1a2e; border-top: 1px solid #2d2d44;
+            flex-shrink: 0;
+        }
+        #messageInput {
+            flex: 1; padding: 0.7rem 1rem; border: 1px solid #444; border-radius: 24px;
+            background: #0f0f0f; color: #e0e0e0; font-size: 0.9rem; outline: none;
+        }
+        #messageInput:focus { border-color: #6c5ce7; }
+        #input-area input[type="file"] { display: none; }
+        .file-btn, .send-btn {
+            padding: 0.6rem 1rem; border: none; border-radius: 24px; cursor: pointer;
+            font-size: 0.85rem; transition: all 0.2s;
+        }
+        .file-btn { background: #2d2d44; color: #aaa; }
+        .file-btn:hover { background: #3d3d54; }
+        .send-btn { background: #6c5ce7; color: #fff; font-weight: 600; }
+        .send-btn:hover { background: #7c6cf7; }
+        #typing { font-size: 0.75rem; color: #888; padding: 0.2rem 1.2rem; flex-shrink: 0; min-height: 1.2rem; }
+        .system-msg {
+            text-align: center; font-size: 0.8rem; color: #666; padding: 0.3rem;
+        }
+        .loading-msg { text-align: center; color: #666; font-size: 0.85rem; padding: 1rem; }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h2>Sala <span th:text="${hash}" style="color:#6c5ce7;"></span></h2>
+        <div>
+            <input type="text" th:value="${shareUrl}" id="shareLink" readonly onclick="this.select()">
+            <button class="btn-copy" onclick="copiarLink()">Copiar</button>
+        </div>
+    </div>
+    <div id="status">Conectando...</div>
+    <div id="messages">
+        <div class="loading-msg">Aguardando conexão...</div>
+    </div>
+    <div id="typing"></div>
+    <div id="input-area">
+        <button class="file-btn" onclick="document.getElementById('fileInput').click()">&#x1f4c1;</button>
+        <input type="file" id="fileInput" accept="image/*,video/*" onchange="enviarArquivo()">
+        <input type="text" id="messageInput" placeholder="Digite sua mensagem..." onkeypress="if(event.key==='Enter') enviarMensagem()">
+        <button class="send-btn" onclick="enviarMensagem()">Enviar</button>
+    </div>
+
+    <script th:inline="javascript">
+        const token = [[${token}]];
+        const hash = [[${hash}]];
+
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = protocol + '//' + window.location.host + '/chat/' + hash + '?token=' + token;
+        let ws = new WebSocket(wsUrl);
+        let participantes = 0;
+        let conectado = false;
+        let reconectarTimer = null;
+
+        const messagesEl = document.getElementById('messages');
+        const statusEl = document.getElementById('status');
+
+        ws.onopen = function() {
+            conectado = true;
+            statusEl.innerHTML = '<span class="connected">&#x25cf; Conectado</span>';
+            messagesEl.innerHTML = '<div class="system-msg">Você entrou na sala</div>';
+            if (reconectarTimer) { clearInterval(reconectarTimer); reconectarTimer = null; }
+        };
+
+        ws.onmessage = function(event) {
+            try {
+                const msg = JSON.parse(event.data);
+                if (msg.type === 'join') {
+                    participantes = msg.participantes;
+                    statusEl.innerHTML = '<span class="connected">&#x25cf; Conectado &middot; ' + participantes + '/2 participantes</span>';
+                    if (participantes === 2) {
+                        adicionarSistema('Outra pessoa entrou na sala');
+                    }
+                } else if (msg.type === 'leave') {
+                    participantes = Math.max(0, (participantes || 1) - 1);
+                    statusEl.innerHTML = '<span class="connected">&#x25cf; Conectado &middot; ' + participantes + '/2 participantes</span>';
+                    adicionarSistema('A outra pessoa saiu da sala');
+                } else if (msg.type === 'message') {
+                    adicionarMensagem(msg.text, 'recebida');
+                } else if (msg.type === 'midia') {
+                    adicionarMidia(msg.url, msg.nome || 'Mídia', 'recebida');
+                } else if (msg.type === 'error') {
+                    adicionarSistema(msg.text || 'Erro');
+                }
+            } catch (e) { /* ignore malformed messages */ }
+        };
+
+        ws.onclose = function() {
+            conectado = false;
+            statusEl.innerHTML = '&#x25cf; Desconectado. Tentando reconectar...';
+            iniciarReconexao();
+        };
+
+        ws.onerror = function() {
+            statusEl.innerHTML = '&#x25cf; Erro de conexão';
+        };
+
+        function iniciarReconexao() {
+            if (reconectarTimer) return;
+            reconectarTimer = setInterval(function() {
+                if (!conectado) {
+                    ws = new WebSocket(wsUrl);
+                    ws.onopen = reconnectHandler;
+                    ws.onmessage = ws.onmessage;
+                    ws.onclose = ws.onclose;
+                    ws.onerror = ws.onerror;
+                }
+            }, 3000);
+        }
+
+        var reconnectHandler = function() {
+            conectado = true;
+            statusEl.innerHTML = '<span class="connected">&#x25cf; Conectado</span>';
+            if (reconectarTimer) { clearInterval(reconectarTimer); reconectarTimer = null; }
+        };
+
+        function enviarMensagem() {
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
+            if (!text || !conectado) return;
+            const msg = { type: 'message', text: text };
+            ws.send(JSON.stringify(msg));
+            adicionarMensagem(text, 'enviada');
+            input.value = '';
+        }
+
+        function enviarArquivo() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            if (!file || !conectado) return;
+            const formData = new FormData();
+            formData.append('file', file);
+            adicionarSistema('Enviando mídia...');
+            fetch('/upload-midia', { method: 'POST', body: formData })
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data.erro) { adicionarSistema('Erro: ' + data.erro); return; }
+                    const msg = { type: 'midia', url: data.url, nome: file.name };
+                    ws.send(JSON.stringify(msg));
+                    adicionarMidia(data.url, file.name, 'enviada');
+                    document.querySelector('.system-msg:last-child')?.remove();
+                })
+                .catch(function() {
+                    adicionarSistema('Erro ao enviar arquivo');
+                });
+            fileInput.value = '';
+        }
+
+        function adicionarMensagem(text, tipo) {
+            const div = document.createElement('div');
+            div.className = 'msg ' + tipo;
+            div.textContent = text;
+            const hora = document.createElement('div');
+            hora.className = 'hora';
+            hora.textContent = new Date().toLocaleTimeString();
+            div.appendChild(hora);
+            messagesEl.appendChild(div);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        function adicionarMidia(url, nome, tipo) {
+            const div = document.createElement('div');
+            div.className = 'msg ' + tipo;
+            if (url.match(/\.(mp4|webm|mov|avi)$/i)) {
+                const video = document.createElement('video');
+                video.src = url;
+                video.controls = true;
+                div.appendChild(video);
+            } else {
+                const img = document.createElement('img');
+                img.src = url;
+                img.alt = nome;
+                img.loading = 'lazy';
+                div.appendChild(img);
+            }
+            const nomeEl = document.createElement('span');
+            nomeEl.className = 'midia-nome';
+            nomeEl.textContent = nome;
+            div.appendChild(nomeEl);
+            const hora = document.createElement('div');
+            hora.className = 'hora';
+            hora.textContent = new Date().toLocaleTimeString();
+            div.appendChild(hora);
+            messagesEl.appendChild(div);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        function adicionarSistema(text) {
+            const div = document.createElement('div');
+            div.className = 'system-msg';
+            div.textContent = text;
+            messagesEl.appendChild(div);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        function copiarLink() {
+            const input = document.getElementById('shareLink');
+            input.select();
+            document.execCommand('copy');
+            alert('Link copiado!');
+        }
+
+        window.addEventListener('beforeunload', function() {
+            if (ws) { ws.close(); }
+        });
+    </script>
+</body>
+</html>

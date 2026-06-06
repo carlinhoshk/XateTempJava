@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TempChat</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f0f0f; color: #e0e0e0; min-height: 100vh; display: flex;
+            align-items: center; justify-content: center;
+        }
+        .container {
+            max-width: 480px; width: 100%; padding: 2rem; text-align: center;
+        }
+        h1 { font-size: 2rem; margin-bottom: 0.5rem; color: #fff; }
+        .subtitle { color: #888; margin-bottom: 2rem; font-size: 0.9rem; }
+        .card {
+            background: #1a1a2e; border-radius: 16px; padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+        .btn {
+            display: inline-block; padding: 0.8rem 2rem; border: none; border-radius: 8px;
+            font-size: 1rem; cursor: pointer; transition: all 0.2s;
+            background: #6c5ce7; color: #fff; font-weight: 600;
+        }
+        .btn:hover { background: #7c6cf7; transform: translateY(-1px); }
+        .btn-secondary { background: #2d2d44; }
+        .btn-secondary:hover { background: #3d3d54; }
+        .btn-danger { background: #e74c3c; }
+        .btn-danger:hover { background: #f05a4a; }
+        .icon { font-size: 3rem; margin-bottom: 1rem; }
+        .info { font-size: 0.85rem; color: #888; margin-top: 1rem; }
+        #salaCriada {
+            display: none; margin-top: 1.5rem; padding: 1rem;
+            background: #2d2d44; border-radius: 8px;
+        }
+        #salaCriada input {
+            width: 100%; padding: 0.6rem; border: 1px solid #444; border-radius: 6px;
+            background: #1a1a2e; color: #e0e0e0; font-size: 0.85rem; margin: 0.5rem 0;
+        }
+        .status { font-size: 0.85rem; margin-bottom: 1.5rem; color: #6c5ce7; }
+        .salas-lista { margin-top: 1.5rem; text-align: left; }
+        .sala-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.7rem; background: #2d2d44; border-radius: 8px; margin-bottom: 0.5rem;
+        }
+        .sala-item a { color: #6c5ce7; text-decoration: none; font-size: 0.9rem; }
+        .sala-item a:hover { text-decoration: underline; }
+        .sala-item .data { font-size: 0.75rem; color: #666; }
+        #loading { color: #666; font-size: 0.85rem; display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card" th:if="${!temToken}">
+            <div class="icon">&#x1f4ac;</div>
+            <h1>TempChat</h1>
+            <p class="subtitle">Chat temporário para 2 pessoas.<br>Sem cadastro. Sem rastreamento. Privacidade total.</p>
+            <form method="post" action="/criar-token">
+                <button type="submit" class="btn">Criar Acesso de 24h</button>
+            </form>
+            <p class="info">Seu acesso expira automaticamente em 24 horas. Sem e-mail, sem senha.</p>
+        </div>
+
+        <div class="card" th:if="${temToken}">
+            <div class="icon">&#x1f4ac;</div>
+            <h1>TempChat</h1>
+            <p class="status">&#x2705; Acesso ativo por 24h</p>
+            <button class="btn" onclick="criarSala()">Criar Nova Sala</button>
+            <div id="salaCriada">
+                <p style="font-size:0.85rem;color:#aaa;">Compartilhe o link com outra pessoa:</p>
+                <input type="text" id="linkSala" readonly onclick="this.select()">
+                <button class="btn btn-secondary" onclick="copiarLink()" style="padding:0.5rem 1rem;font-size:0.85rem;">Copiar Link</button>
+            </div>
+            <div id="salas">
+                <div class="salas-lista" id="salasLista"></div>
+            </div>
+            <p class="info" style="margin-top:1.5rem;">
+                <a href="/" style="color:#6c5ce7;">Atualizar</a> &middot;
+                <span id="tokenDisplay" style="font-size:0.75rem;color:#555;word-break:break-all;" th:text="'Token: ' + ${token}"></span>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        async function criarSala() {
+            const btn = document.querySelector('.btn');
+            btn.disabled = true;
+            btn.textContent = 'Criando...';
+            try {
+                const res = await fetch('/criar-sala', { method: 'POST' });
+                const data = await res.json();
+                if (data.erro) {
+                    alert(data.erro);
+                    return;
+                }
+                document.getElementById('salaCriada').style.display = 'block';
+                document.getElementById('linkSala').value = data.url;
+                carregarSalas();
+            } catch (e) {
+                alert('Erro ao criar sala');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Criar Nova Sala';
+            }
+        }
+
+        function copiarLink() {
+            const input = document.getElementById('linkSala');
+            input.select();
+            document.execCommand('copy');
+            alert('Link copiado!');
+        }
+
+        async function carregarSalas() {
+            const container = document.getElementById('salasLista');
+            container.innerHTML = '<div id="loading">Carregando...</div>';
+            try {
+                const res = await fetch('/minhas-salas');
+                const data = await res.json();
+                if (data.erro || !data.salas || data.salas.length === 0) {
+                    container.innerHTML = '';
+                    return;
+                }
+                container.innerHTML = '<h3 style="font-size:0.9rem;margin-bottom:0.5rem;color:#aaa;">Suas salas</h3>';
+                data.salas.forEach(s => {
+                    const div = document.createElement('div');
+                    div.className = 'sala-item';
+                    const base = window.location.origin;
+                    div.innerHTML = '<a href="' + base + '/sala/' + s.hash + '" target="_blank">' + s.hash + '</a>' +
+                        '<span class="data">' + new Date(s.criadoEm).toLocaleString() + '</span>';
+                    container.appendChild(div);
+                });
+            } catch (e) {
+                container.innerHTML = '';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            if (document.querySelector('.status')) {
+                carregarSalas();
+            }
+        });
+    </script>
+</body>
+</html>
